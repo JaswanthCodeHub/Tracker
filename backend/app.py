@@ -13,7 +13,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB = ROOT / "data" / "equipment_tracker.db"
+
+# Vercel serverless has a read-only filesystem; only /tmp is writable.
+_ON_VERCEL = bool(os.environ.get("VERCEL"))
+DEFAULT_DB = Path("/tmp/equipment_tracker.db") if _ON_VERCEL else ROOT / "data" / "equipment_tracker.db"
 VALID_CONDITIONS = {"excellent", "good", "fair", "damaged", "lost"}
 RETURN_STATUSES = {"due", "overdue", "returned", "inspection", "claim_pending", "closed"}
 BOOKING_STATUSES = {"pending", "approved", "active", "return_requested", "returned", "rejected", "cancelled"}
@@ -33,7 +36,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
     if test_config:
         app.config.update(test_config)
-    Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
+    db_path = Path(app.config["DATABASE"])
+    db_path.parent.mkdir(parents=True, exist_ok=True)
 
     def now() -> str:
         return datetime.now(timezone.utc).isoformat()
