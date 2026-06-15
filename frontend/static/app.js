@@ -207,7 +207,6 @@ function setAuthMode(mode) {
   const isRegister = mode === "register";
   $("#loginForm").classList.toggle("hidden", isRegister);
   $("#createAccountForm").classList.toggle("hidden", !isRegister);
-  $("#demoLogins").classList.toggle("hidden", isRegister);
   $("#showLogin").classList.toggle("active", !isRegister);
   $("#showRegister").classList.toggle("active", isRegister);
   $("#authTitle").textContent = isRegister ? "Create account" : "Welcome back";
@@ -229,6 +228,5 @@ document.querySelectorAll("[data-toggle-password]").forEach(button => {
     });
   };
 });
-document.querySelectorAll("[data-demo]").forEach(button => button.onclick = () => { const role=button.dataset.demo; $("#loginForm [name=email]").value=role==="admin"?"admin@sd-digitals.com":"user@sd-digitals.com"; $("#loginForm [name=password]").value=role==="admin"?"Admin@123":"User@123"; });
 $("#logoutBtn").onclick = async () => { await api("/api/auth/logout",{method:"POST"}); state.user=null; $("#appShell").classList.add("hidden"); $("#loginPage").classList.remove("hidden"); toast("Logged out"); };
 boot();

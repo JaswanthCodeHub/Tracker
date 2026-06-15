@@ -320,38 +320,7 @@ input:focus, select:focus, textarea:focus {
 
 .full { width: 100%; }
 
-.demo-logins {
-  border-top: 1px solid var(--line);
-  margin-top: 24px;
-  padding-top: 14px;
-}
 
-.demo-logins > p {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 800;
-  margin: 0 0 9px;
-}
-
-.demo-logins button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 12px;
-  border: 1px solid transparent;
-  background: #f8fafc;
-  border-radius: 13px;
-  margin-top: 8px;
-  color: var(--navy);
-}
-
-.demo-logins button:hover {
-  border-color: #c7d2fe;
-  background: #eef2ff;
-}
-
-.demo-logins small { color: var(--muted); }
 
 .sidebar {
   position: fixed;
