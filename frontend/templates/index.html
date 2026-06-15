@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Equipment Return & Damage Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <section class="login-page" id="loginPage">
+    <div class="login-brand">
+      <span class="brand-mark">SD</span>
+      <div><strong>SD Digitals</strong><small>Equipment operations platform</small></div>
+    </div>
+    <div class="login-layout">
+      <div class="login-copy">
+        <p class="eyebrow">RENTAL MANAGEMENT</p>
+        <h1>Every rental, return and damage claim in one place.</h1>
+        <p>Book equipment with confidence. Track active rentals. Process returns and settle damage claims through one clear workflow.</p>
+        <div class="feature-row"><span>01</span><div><b>User rental portal</b><small>Browse, book, return and review your rentals</small></div></div>
+        <div class="feature-row"><span>02</span><div><b>Admin operations</b><small>Manage inventory, customers, claims and reports</small></div></div>
+      </div>
+      <div class="login-card">
+        <p class="eyebrow">SECURE ACCESS</p>
+        <h2 id="authTitle">Welcome back</h2>
+        <p class="muted" id="authSubtitle">Enter your account details to continue.</p>
+        <div class="auth-switch">
+          <button type="button" class="active" id="showLogin">Sign in</button>
+          <button type="button" id="showRegister">Create account</button>
+        </div>
+        <form id="loginForm" class="auth-form">
+          <label>Email address<input type="email" name="email" placeholder="name@example.com" required></label>
+          <label>Password
+            <span class="password-field">
+              <input type="password" name="password" placeholder="Enter password" required>
+              <button type="button" data-toggle-password="loginForm">Show</button>
+            </span>
+          </label>
+          <button class="primary full" type="submit">Sign in</button>
+        </form>
+        <form id="createAccountForm" class="auth-form hidden">
+          <label>Full name<input name="name" placeholder="Your full name" required maxlength="100"></label>
+          <label>Phone number<input name="phone" placeholder="+91 98765 43210" maxlength="30"></label>
+          <label>Email address<input type="email" name="email" placeholder="you@example.com" required maxlength="120"></label>
+          <label>Password
+            <span class="password-field">
+              <input type="password" name="password" placeholder="Minimum 6 characters" required minlength="6">
+              <button type="button" data-toggle-password="createAccountForm">Show</button>
+            </span>
+          </label>
+          <label>Confirm password
+            <span class="password-field">
+              <input type="password" name="confirm_password" placeholder="Repeat password" required minlength="6">
+              <button type="button" data-toggle-password="createAccountForm">Show</button>
+            </span>
+          </label>
+          <button class="primary full" type="submit">Create account</button>
+        </form>
+        <div class="demo-logins" id="demoLogins">
+          <p>Demo accounts</p>
+          <button type="button" data-demo="user"><b>User</b><small>user@sd-digitals.com / User@123</small></button>
+          <button type="button" data-demo="admin"><b>Admin</b><small>admin@sd-digitals.com / Admin@123</small></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="app-shell hidden" id="appShell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">SD</span><div><strong>SD Digitals</strong><small id="portalName">Portal</small></div></div>
+      <nav id="navigation"></nav>
+      <div class="sidebar-foot">
+        <span class="avatar" id="userInitials">U</span>
+        <div><strong id="sidebarName">User</strong><small id="sidebarRole">Account</small></div>
+        <button id="logoutBtn" title="Log out">Exit</button>
+      </div>
+    </aside>
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow" id="pageEyebrow">PORTAL</p><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle" class="muted"></p></div>
+        <div id="headerAction"></div>
+      </header>
+      <div id="pageContent"><div class="loading">Loading workspace...</div></div>
+    </main>
+  </section>
+
+  <dialog id="modal"><div id="modalContent"></div></dialog>
+  <div class="toast" id="toast"></div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
