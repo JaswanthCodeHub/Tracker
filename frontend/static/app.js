@@ -7,13 +7,13 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, c => ({"&"
 
 const menus = {
   user: [
-    ["dashboard", "DB", "Dashboard"], ["book", "BK", "Book Equipment"], ["return", "RT", "Return Equipment"],
-    ["rentals", "MR", "My Rentals"], ["profile", "PF", "Profile"]
+    ["dashboard", "Dashboard"], ["book", "Book Equipment"], ["return", "Return Equipment"],
+    ["rentals", "My Rentals"], ["profile", "Profile"]
   ],
   admin: [
-    ["dashboard", "DB", "Dashboard"], ["equipment", "EQ", "Equipment Management"], ["customers", "CU", "Customer Management"],
-    ["returns", "RR", "Return Requests"], ["damages", "DR", "Damage Reports"], ["deductions", "DD", "Deposit Deduction"],
-    ["statuses", "ST", "Status Updates"], ["reports", "RP", "Reports"]
+    ["dashboard", "Dashboard"], ["equipment", "Equipment Management"], ["customers", "Customer Management"],
+    ["returns", "Return Requests"], ["damages", "Damage Reports"], ["deductions", "Deposit Deduction"],
+    ["statuses", "Status Updates"], ["reports", "Reports"]
   ]
 };
 
@@ -43,12 +43,6 @@ function table(headers, rows, empty = "No records found") {
   return `<div class="panel"><div class="table-wrap"><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>${rows.length ? "" : `<div class="empty">${empty}</div>`}</div></div>`;
 }
 function cards(items) { return `<div class="summary-grid">${items.map((x,i) => `<article class="summary-card"><span class="summary-icon ${x[2] || ""}">${String(i+1).padStart(2,"0")}</span><div><small>${x[0]}</small><strong>${x[1]}</strong></div></article>`).join("")}</div>`; }
-function hero(title, subtitle, actions = []) {
-  return `<section class="hero-panel"><div><p class="eyebrow">SD DIGITALS CONTROL CENTER</p><h2>${escapeHtml(title)}</h2><p>${escapeHtml(subtitle)}</p></div><div class="hero-actions">${actions.map(a => `<button class="${a[2] || "primary"}" data-jump="${a[1]}">${escapeHtml(a[0])}</button>`).join("")}</div></section>`;
-}
-function wireJumps() {
-  document.querySelectorAll("[data-jump]").forEach(button => button.onclick = () => loadView(button.dataset.jump));
-}
 
 function openModal(html) { $("#modalContent").innerHTML = `<div class="modal-body">${html}</div>`; $("#modal").showModal(); document.querySelectorAll(".modal-close").forEach(b => b.onclick = () => $("#modal").close()); }
 function modalHead(title, subtitle = "") { return `<div class="modal-head"><div><h2>${title}</h2>${subtitle ? `<p class="muted">${subtitle}</p>` : ""}</div><button type="button" class="modal-close">x</button></div>`; }
@@ -59,11 +53,18 @@ async function boot() {
 
 function showApp() {
   $("#loginPage").classList.add("hidden"); $("#appShell").classList.remove("hidden");
+  /* Clear all login / auth forms so no details persist outside the app */
+  document.querySelectorAll("#loginPage form").forEach(f => f.reset());
+  ["#resetEmail","#newPassEmail","#newPassOtp"].forEach(s => { const el = $(s); if (el) el.value = ""; });
+  $("#forgotNotice").classList.add("hidden");
+  /* Reset any revealed passwords back to hidden */
+  document.querySelectorAll("#loginPage .password-wrap input").forEach(i => i.type = "password");
+  document.querySelectorAll("#loginPage .toggle-pw").forEach(b => b.textContent = "\ud83d\udc41");
   $("#portalName").textContent = state.user.role === "admin" ? "Admin operations" : "Customer rental portal";
   $("#sidebarName").textContent = state.user.name; $("#sidebarRole").textContent = state.user.role === "admin" ? "Administrator" : "Customer";
   $("#userInitials").textContent = state.user.name.split(" ").map(x => x[0]).slice(0,2).join("").toUpperCase();
-  $("#navigation").innerHTML = menus[state.user.role].map(item => `<button class="nav-item" data-view="${item[0]}"><span class="nav-icon">${item[1]}</span>${item[2]}</button>`).join("");
-  document.querySelectorAll(".nav-item").forEach(button => button.onclick = () => loadView(button.dataset.view));
+  $("#navigation").innerHTML = menus[state.user.role].map(item => `<button class="nav-item" data-view="${item[0]}">${item[1]}</button>`).join("");
+  document.querySelectorAll(".nav-item").forEach(button => button.onclick = () => { toggleSidebar(false); loadView(button.dataset.view); });
   loadView("dashboard");
 }
 
@@ -72,7 +73,7 @@ async function loadView(view) {
   $("#pageEyebrow").textContent = info[0]; $("#pageTitle").textContent = info[1]; $("#pageSubtitle").textContent = info[2]; $("#headerAction").innerHTML = "";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   $("#pageContent").innerHTML = `<div class="loading">Loading ${info[1].toLowerCase()}...</div>`;
-  try { await renderers[view](); wireJumps(); } catch (error) { $("#pageContent").innerHTML = `<div class="panel empty">${escapeHtml(error.message)}</div>`; toast(error.message, true); }
+  try { await renderers[view](); } catch (error) { $("#pageContent").innerHTML = `<div class="panel empty">${escapeHtml(error.message)}</div>`; toast(error.message, true); }
 }
 
 const renderers = {
@@ -80,10 +81,10 @@ const renderers = {
     const data = await api("/api/dashboard");
     if (state.user.role === "user") {
       const rows = data.recent.map(b => `<tr><td><strong>${escapeHtml(b.equipment_name)}</strong><small>${escapeHtml(b.equipment_code)}</small></td><td>${dateText(b.start_date)} - ${dateText(b.end_date)}</td><td>${money(b.total_amount)}</td><td>${badge(b.is_overdue ? "overdue" : b.status)}</td></tr>`);
-      $("#pageContent").innerHTML = hero(`Welcome, ${state.user.name}`, "Book camera gear, track rental status, and request returns from one clean workspace.", [["Book equipment","book"],["View rentals","rentals","ghost"]]) + cards([["Total rentals",data.total_rentals],["Active",data.active,"green"],["Pending",data.pending,"amber"],["Returned",data.returned]]) + table(["Equipment","Rental period","Amount","Status"], rows, "You have no rentals yet.");
+      $("#pageContent").innerHTML = cards([["Total rentals",data.total_rentals],["Active",data.active,"green"],["Pending",data.pending,"amber"],["Returned",data.returned]]) + table(["Equipment","Rental period","Amount","Status"], rows, "You have no rentals yet.");
     } else {
       const rows = data.recent.map(r => `<tr><td><strong>${escapeHtml(r.equipment_name)}</strong><small>${escapeHtml(r.equipment_code)}</small></td><td>${escapeHtml(r.customer_name)}</td><td>${dateText(r.return_due_date)}</td><td>${badge(r.is_overdue ? "overdue" : r.status)}</td></tr>`);
-      $("#pageContent").innerHTML = hero("Admin operations workspace", "Monitor inventory, customers, returns, claims, deposit deductions, and reports with a polished control panel.", [["Manage equipment","equipment"],["Reports","reports","ghost"]]) + cards([["Equipment",data.equipment],["Customers",data.customers],["Pending bookings",data.pending_bookings,"amber"],["Open claims",data.claims,"red"]]) + `<div class="content-grid">${table(["Equipment","Customer","Due date","Status"],rows,"No return activity yet.")}<aside class="panel side-panel"><h3>Financial snapshot</h3><div class="metric-line"><span>Repair exposure</span><b>${money(data.repair_cost)}</b></div><div class="metric-line"><span>Deposit deductions</span><b>${money(data.deductions)}</b></div><div class="metric-line"><span>Available units</span><b>${data.available}</b></div><div class="metric-line"><span>Overdue returns</span><b>${data.overdue}</b></div></aside></div>`;
+      $("#pageContent").innerHTML = cards([["Equipment",data.equipment],["Customers",data.customers],["Pending bookings",data.pending_bookings,"amber"],["Open claims",data.claims,"red"]]) + `<div class="content-grid">${table(["Equipment","Customer","Due date","Status"],rows,"No return activity yet.")}<aside class="panel side-panel"><h3>Financial snapshot</h3><div class="metric-line"><span>Repair exposure</span><b>${money(data.repair_cost)}</b></div><div class="metric-line"><span>Deposit deductions</span><b>${money(data.deductions)}</b></div><div class="metric-line"><span>Available units</span><b>${data.available}</b></div><div class="metric-line"><span>Overdue returns</span><b>${data.overdue}</b></div></aside></div>`;
     }
   },
   async book() {
@@ -184,49 +185,151 @@ async function updateBookingStatus(id,status) { try{await api(`/api/bookings/${i
 async function updateReturnStatus(id,status) { try{await api(`/api/returns/${id}/status`,{method:"PATCH",body:JSON.stringify({status})});toast("Return status updated");}catch(e){toast(e.message,true);loadView("statuses");} }
 async function updateCustomer(value) { const [id,active]=value.split(":"); try{await api(`/api/customers/${id}`,{method:"PATCH",body:JSON.stringify({active:active==="1"})});toast("Customer account updated");loadView("customers");}catch(e){toast(e.message,true);} }
 
-$("#loginForm").onsubmit = async event => { event.preventDefault(); try { const data=await api("/api/auth/login",{method:"POST",body:JSON.stringify(Object.fromEntries(new FormData(event.target)))}); state.user=data.user; showApp(); } catch(e){toast(e.message,true);} };
-$("#createAccountForm").onsubmit = async event => {
+
+/* ---------- Auth view switching ---------- */
+function showAuthView(viewId) {
+  ["loginView","registerView","forgotView","resetView","setPasswordView"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.toggle("hidden", id !== viewId);
+      if (id !== viewId) el.querySelectorAll("form").forEach(f => f.reset());
+    }
+  });
+  $("#forgotNotice").classList.add("hidden");
+}
+
+$("#showForgot").onclick = () => showAuthView("forgotView");
+$("#showRegister").onclick = () => showAuthView("registerView");
+$("#showLoginFromRegister").onclick = () => showAuthView("loginView");
+$("#showLoginFromForgot").onclick = () => showAuthView("loginView");
+$("#showLoginFromReset").onclick = () => showAuthView("loginView");
+$("#showLoginFromSetPass").onclick = () => showAuthView("loginView");
+
+/* ---------- Login ---------- */
+$("#loginForm").onsubmit = async event => {
   event.preventDefault();
-  const payload = Object.fromEntries(new FormData(event.target));
-  if (payload.password !== payload.confirm_password) {
+  const formData = Object.fromEntries(new FormData(event.target));
+  const identifier = (formData.identifier || "").trim();
+  const payload = { password: formData.password };
+  if (identifier.includes("@")) {
+    payload.email = identifier;
+  } else {
+    payload.phone = identifier;
+  }
+  try {
+    const data = await api("/api/auth/login", { method: "POST", body: JSON.stringify(payload) });
+    state.user = data.user;
+    showApp();
+  } catch (e) { toast(e.message, true); }
+};
+
+/* ---------- Register ---------- */
+$("#registerForm").onsubmit = async event => {
+  event.preventDefault();
+  try {
+    const data = await api("/api/auth/register", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.target))) });
+    state.user = data.user;
+    toast("Account created successfully!");
+    showApp();
+  } catch (e) { toast(e.message, true); }
+};
+
+/* ---------- Forgot Password (send OTP) ---------- */
+$("#forgotForm").onsubmit = async event => {
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(event.target));
+  const identifier = (formData.identifier || "").trim();
+  const isEmail = identifier.includes("@");
+  const payload = isEmail ? { email: identifier } : { phone: identifier };
+  try {
+    const data = await api("/api/auth/forgot-password", { method: "POST", body: JSON.stringify(payload) });
+    $("#resetEmail").value = data.email || identifier;
+    const notice = $("#forgotNotice");
+    if (data.dev_otp) {
+      notice.innerHTML = `<div class="notice info">Development OTP: <strong>${data.dev_otp}</strong>. Configure SMTP/SMS to send it automatically.</div>`;
+      notice.classList.remove("hidden");
+      $("#resetSubtitle").textContent = `Use the development OTP shown below for ${identifier}`;
+    } else {
+      notice.classList.add("hidden");
+      $("#resetSubtitle").textContent = `We sent a 6-digit OTP to ${identifier}`;
+    }
+    showAuthView("resetView");
+    toast(data.message);
+  } catch (e) { toast(e.message, true); }
+};
+
+/* ---------- Step 1: Verify OTP ---------- */
+$("#verifyOtpForm").onsubmit = async event => {
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(event.target));
+  try {
+    await api("/api/auth/verify-otp", { method: "POST", body: JSON.stringify(formData) });
+    toast("OTP verified successfully!");
+    $("#newPassEmail").value = formData.email;
+    $("#newPassOtp").value = formData.otp;
+    showAuthView("setPasswordView");
+  } catch (e) { toast(e.message, true); }
+};
+
+/* ---------- Step 2: Set New Password ---------- */
+$("#setPasswordForm").onsubmit = async event => {
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(event.target));
+  const confirmPass = $("#confirmPassword").value;
+  if (formData.password !== confirmPass) {
     toast("Passwords do not match", true);
     return;
   }
-  delete payload.confirm_password;
   try {
-    const data = await api("/api/auth/register", { method: "POST", body: JSON.stringify(payload) });
-    state.user = data.user;
-    event.target.reset();
-    toast("Account created successfully");
-    showApp();
-  } catch (e) {
-    toast(e.message, true);
-  }
+    const data = await api("/api/auth/reset-password", { method: "POST", body: JSON.stringify(formData) });
+    toast(data.message || "Password reset successfully!");
+    ["#setPasswordForm","#verifyOtpForm","#forgotForm","#loginForm","#registerForm"].forEach(s => { const f = $(s); if (f) f.reset(); });
+    $("#resetEmail").value = "";
+    $("#newPassEmail").value = "";
+    $("#newPassOtp").value = "";
+    $("#forgotNotice").classList.add("hidden");
+    showAuthView("loginView");
+  } catch (e) { toast(e.message, true); }
 };
-function setAuthMode(mode) {
-  const isRegister = mode === "register";
-  $("#loginForm").classList.toggle("hidden", isRegister);
-  $("#createAccountForm").classList.toggle("hidden", !isRegister);
-  $("#showLogin").classList.toggle("active", !isRegister);
-  $("#showRegister").classList.toggle("active", isRegister);
-  $("#authTitle").textContent = isRegister ? "Create account" : "Welcome back";
-  $("#authSubtitle").textContent = isRegister ? "Set up your customer account to book and return equipment." : "Enter your account details to continue.";
-}
-$("#showLogin").onclick = () => setAuthMode("login");
-$("#showRegister").onclick = () => setAuthMode("register");
-document.querySelectorAll("[data-toggle-password]").forEach(button => {
-  button.onclick = () => {
-    const form = document.getElementById(button.dataset.togglePassword);
-    const inputs = form.querySelectorAll('input[type="password"], input[data-password-visible="true"]');
-    const shouldShow = [...inputs].some(input => input.type === "password");
-    inputs.forEach(input => {
-      input.type = shouldShow ? "text" : "password";
-      input.dataset.passwordVisible = shouldShow ? "true" : "false";
-    });
-    form.querySelectorAll("[data-toggle-password]").forEach(toggle => {
-      toggle.textContent = shouldShow ? "Hide" : "Show";
-    });
-  };
+
+/* ---------- Logout ---------- */
+$("#logoutBtn").onclick = async () => {
+  await api("/api/auth/logout", { method: "POST" });
+  state.user = null;
+  $("#appShell").classList.add("hidden");
+  /* Clear all auth forms so no details linger */
+  document.querySelectorAll("#loginPage form").forEach(f => f.reset());
+  ["#resetEmail","#newPassEmail","#newPassOtp"].forEach(s => { const el = $(s); if (el) el.value = ""; });
+  $("#forgotNotice").classList.add("hidden");
+  document.querySelectorAll("#loginPage .password-wrap input").forEach(i => i.type = "password");
+  document.querySelectorAll("#loginPage .toggle-pw").forEach(b => b.textContent = "\ud83d\udc41");
+  $("#loginPage").classList.remove("hidden");
+  showAuthView("loginView");
+  toast("Logged out");
+};
+
+/* ---------- Show / Hide password toggle ---------- */
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".toggle-pw");
+  if (!btn) return;
+  const input = btn.parentElement.querySelector("input");
+  if (!input) return;
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  btn.textContent = showing ? "\ud83d\udc41" : "\ud83d\ude48";
+  btn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
 });
-$("#logoutBtn").onclick = async () => { await api("/api/auth/logout",{method:"POST"}); state.user=null; $("#appShell").classList.add("hidden"); $("#loginPage").classList.remove("hidden"); toast("Logged out"); };
+
+/* ---------- Mobile sidebar toggle ---------- */
+function toggleSidebar(open) {
+  const sidebar = $("#sidebar");
+  const backdrop = $("#sidebarBackdrop");
+  if (open === undefined) open = !sidebar.classList.contains("open");
+  sidebar.classList.toggle("open", open);
+  backdrop.classList.toggle("active", open);
+}
+$("#menuToggle").onclick = () => toggleSidebar();
+$("#sidebarBackdrop").onclick = () => toggleSidebar(false);
+
 boot();
+

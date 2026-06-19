@@ -70,6 +70,29 @@ class TrackerWorkflowTests(unittest.TestCase):
         response = self.client.post("/api/auth/register", json={"name": "Short", "email": "short@example.com", "password": "123"})
         self.assertEqual(response.status_code, 400)
 
+    def test_forgot_password_resets_existing_account(self):
+        otp_response = self.client.post("/api/auth/forgot-password", json={"email": "user@sd-digitals.com"})
+        self.assertEqual(otp_response.status_code, 200)
+        otp = otp_response.get_json()["dev_otp"]
+        response = self.client.post("/api/auth/reset-password", json={"email": "user@sd-digitals.com", "otp": otp, "password": "Changed123"})
+        self.assertEqual(response.status_code, 200)
+        login = self.client.post("/api/auth/login", json={"email": "user@sd-digitals.com", "password": "Changed123"})
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.get_json()["user"]["role"], "user")
+
+    def test_forgot_password_rejects_unknown_email(self):
+        response = self.client.post("/api/auth/forgot-password", json={"email": "missing@example.com"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_forgot_password_rejects_short_password(self):
+        response = self.client.post("/api/auth/reset-password", json={"email": "user@sd-digitals.com", "otp": "123456", "password": "123"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_forgot_password_rejects_invalid_otp(self):
+        self.client.post("/api/auth/forgot-password", json={"email": "user@sd-digitals.com"})
+        response = self.client.post("/api/auth/reset-password", json={"email": "user@sd-digitals.com", "otp": "000000", "password": "Changed123"})
+        self.assertEqual(response.status_code, 400)
+
     def test_user_can_view_equipment_and_book(self):
         self.login("user")
         equipment = self.client.get("/api/equipment").get_json()

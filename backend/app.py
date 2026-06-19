@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import os
+import secrets
+import smtplib
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from email.message import EmailMessage
 from functools import wraps
 from pathlib import Path
 
@@ -13,13 +17,27 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 
 ROOT = Path(__file__).resolve().parents[1]
-
-# Vercel serverless has a read-only filesystem; only /tmp is writable.
-_ON_VERCEL = bool(os.environ.get("VERCEL"))
-DEFAULT_DB = Path("/tmp/equipment_tracker.db") if _ON_VERCEL else ROOT / "data" / "equipment_tracker.db"
+DEFAULT_DB = ROOT / "data" / "equipment_tracker.db"
 VALID_CONDITIONS = {"excellent", "good", "fair", "damaged", "lost"}
 RETURN_STATUSES = {"due", "overdue", "returned", "inspection", "claim_pending", "closed"}
 BOOKING_STATUSES = {"pending", "approved", "active", "return_requested", "returned", "rejected", "cancelled"}
+
+
+def load_env_file() -> None:
+    env_path = ROOT / ".env"
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key, value)
+
+
+load_env_file()
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -36,8 +54,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     )
     if test_config:
         app.config.update(test_config)
-    db_path = Path(app.config["DATABASE"])
-    db_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
 
     def now() -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -147,6 +164,41 @@ def create_app(test_config: dict | None = None) -> Flask:
             (return_id, action, from_status, to_status, note),
         )
 
+    def hash_otp(email: str, otp: str) -> str:
+        return hashlib.sha256(f"{email.lower()}:{otp}:{app.config['SECRET_KEY']}".encode("utf-8")).hexdigest()
+
+    def send_reset_email(email: str, otp: str) -> bool:
+        smtp_host = os.environ.get("SMTP_HOST", "").strip()
+        smtp_user = os.environ.get("SMTP_USER", "").strip()
+        smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
+        smtp_from = os.environ.get("SMTP_FROM", smtp_user or "no-reply@sd-digitals.local").strip()
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_use_ssl = os.environ.get("SMTP_USE_SSL", "false").strip().lower() in {"1", "true", "yes"}
+        smtp_use_tls = os.environ.get("SMTP_USE_TLS", "true").strip().lower() in {"1", "true", "yes"}
+        if not smtp_host:
+            app.logger.info("Password reset OTP for %s: %s", email, otp)
+            return False
+        message = EmailMessage()
+        message["Subject"] = "SD Digitals password reset OTP"
+        message["From"] = smtp_from
+        message["To"] = email
+        message.set_content(
+            f"Your SD Digitals password reset OTP is {otp}.\n\n"
+            "This OTP expires in 10 minutes. If you did not request this reset, ignore this email."
+        )
+        try:
+            smtp_class = smtplib.SMTP_SSL if smtp_use_ssl else smtplib.SMTP
+            with smtp_class(smtp_host, smtp_port, timeout=10) as smtp:
+                if smtp_use_tls and not smtp_use_ssl:
+                    smtp.starttls()
+                if smtp_user:
+                    smtp.login(smtp_user, smtp_password)
+                smtp.send_message(message)
+            return True
+        except Exception as exc:
+            app.logger.warning("SMTP send failed for %s: %s", email, exc)
+            return False
+
     @app.get("/")
     def index():
         return render_template("index.html")
@@ -159,9 +211,15 @@ def create_app(test_config: dict | None = None) -> Flask:
     def login():
         payload = request.get_json(silent=True) or {}
         email = str(payload.get("email", "")).strip().lower()
-        user = get_db().execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+        phone = str(payload.get("phone", "")).strip()
+        # Try email first, then phone number
+        user = None
+        if email:
+            user = get_db().execute("SELECT * FROM users WHERE lower(email)=?", (email,)).fetchone()
+        if user is None and phone:
+            user = get_db().execute("SELECT * FROM users WHERE phone=?", (phone,)).fetchone()
         if user is None or not user["active"] or not check_password_hash(user["password_hash"], str(payload.get("password", ""))):
-            return jsonify(error="Invalid email or password"), 401
+            return jsonify(error="Invalid credentials"), 401
         session.clear()
         session["user_id"] = user["id"]
         return jsonify(user={key: user[key] for key in ("id", "name", "email", "phone", "role")})
@@ -194,6 +252,101 @@ def create_app(test_config: dict | None = None) -> Flask:
         session["user_id"] = cursor.lastrowid
         user = db.execute("SELECT id,name,email,phone,role FROM users WHERE id=?", (cursor.lastrowid,)).fetchone()
         return jsonify(user=dict(user), message="Account created successfully"), 201
+
+    @app.post("/api/auth/forgot-password")
+    def forgot_password():
+        payload = request.get_json(silent=True) or {}
+        email = str(payload.get("email", "")).strip().lower()
+        phone = str(payload.get("phone", "")).strip()
+        db = get_db()
+        user = None
+        if email:
+            user = db.execute("SELECT id,email,active FROM users WHERE lower(email)=?", (email,)).fetchone()
+        if user is None and phone:
+            user = db.execute("SELECT id,email,active FROM users WHERE phone=?", (phone,)).fetchone()
+        if not email and not phone:
+            return jsonify(error="Enter your email or phone number"), 400
+        if user is None or not user["active"]:
+            return jsonify(error="Account not found"), 404
+        user_email = user["email"]
+        otp = f"{secrets.randbelow(900000) + 100000}"
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+        db.execute("UPDATE password_reset_otps SET used=1 WHERE user_id=? AND used=0", (user["id"],))
+        db.execute(
+            "INSERT INTO password_reset_otps (user_id,email,otp_hash,expires_at,created_at) VALUES (?,?,?,?,?)",
+            (user["id"], user_email, hash_otp(user_email, otp), expires_at, now()),
+        )
+        db.commit()
+        sent = send_reset_email(user_email, otp)
+        response = {"message": "OTP sent successfully", "email": user_email, "email_sent": sent}
+        if not sent:
+            response["dev_otp"] = otp
+            response["message"] = "OTP generated. Configure SMTP/SMS to send automatically; dev OTP returned for testing."
+        return jsonify(response)
+
+    @app.post("/api/auth/verify-otp")
+    def verify_otp():
+        payload = request.get_json(silent=True) or {}
+        email = str(payload.get("email", "")).strip().lower()
+        otp = str(payload.get("otp", "")).strip()
+        errors = []
+        if "@" not in email or "." not in email.split("@")[-1]:
+            errors.append("Valid email address is required")
+        if not otp.isdigit() or len(otp) != 6:
+            errors.append("Valid 6 digit OTP is required")
+        if errors:
+            return jsonify(error="OTP verification failed", details=errors), 400
+        db = get_db()
+        user = db.execute("SELECT id,active FROM users WHERE lower(email)=?", (email,)).fetchone()
+        if user is None or not user["active"]:
+            return jsonify(error="Account not found"), 404
+        otp_row = db.execute(
+            "SELECT id,otp_hash,expires_at FROM password_reset_otps WHERE user_id=? AND email=? AND used=0 ORDER BY id DESC LIMIT 1",
+            (user["id"], email),
+        ).fetchone()
+        if otp_row is None or otp_row["otp_hash"] != hash_otp(email, otp):
+            return jsonify(error="Invalid OTP"), 400
+        expires_at = datetime.fromisoformat(otp_row["expires_at"])
+        if expires_at < datetime.now(timezone.utc):
+            db.execute("UPDATE password_reset_otps SET used=1 WHERE id=?", (otp_row["id"],))
+            db.commit()
+            return jsonify(error="OTP expired"), 400
+        return jsonify(message="OTP verified successfully", verified=True)
+
+    @app.post("/api/auth/reset-password")
+    def reset_password():
+        payload = request.get_json(silent=True) or {}
+        email = str(payload.get("email", "")).strip().lower()
+        otp = str(payload.get("otp", "")).strip()
+        password = str(payload.get("password", ""))
+        errors = []
+        if "@" not in email or "." not in email.split("@")[-1]:
+            errors.append("Valid email address is required")
+        if not otp.isdigit() or len(otp) != 6:
+            errors.append("Valid 6 digit OTP is required")
+        if len(password) < 6:
+            errors.append("Password must be at least 6 characters")
+        if errors:
+            return jsonify(error="Password reset failed", details=errors), 400
+        db = get_db()
+        user = db.execute("SELECT id,active FROM users WHERE lower(email)=?", (email,)).fetchone()
+        if user is None or not user["active"]:
+            return jsonify(error="Account not found"), 404
+        otp_row = db.execute(
+            "SELECT id,otp_hash,expires_at FROM password_reset_otps WHERE user_id=? AND email=? AND used=0 ORDER BY id DESC LIMIT 1",
+            (user["id"], email),
+        ).fetchone()
+        if otp_row is None or otp_row["otp_hash"] != hash_otp(email, otp):
+            return jsonify(error="Invalid OTP"), 400
+        expires_at = datetime.fromisoformat(otp_row["expires_at"])
+        if expires_at < datetime.now(timezone.utc):
+            db.execute("UPDATE password_reset_otps SET used=1 WHERE id=?", (otp_row["id"],))
+            db.commit()
+            return jsonify(error="OTP expired"), 400
+        db.execute("UPDATE users SET password_hash=?,updated_at=? WHERE id=?", (generate_password_hash(password), now(), user["id"]))
+        db.execute("UPDATE password_reset_otps SET used=1 WHERE id=?", (otp_row["id"],))
+        db.commit()
+        return jsonify(message="Password reset successfully")
 
     @app.post("/api/auth/logout")
     def logout():

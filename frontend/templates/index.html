@@ -24,48 +24,92 @@
         <div class="feature-row"><span>02</span><div><b>Admin operations</b><small>Manage inventory, customers, claims and reports</small></div></div>
       </div>
       <div class="login-card">
-        <p class="eyebrow">SECURE ACCESS</p>
-        <h2 id="authTitle">Welcome back</h2>
-        <p class="muted" id="authSubtitle">Enter your account details to continue.</p>
-        <div class="auth-switch">
-          <button type="button" class="active" id="showLogin">Sign in</button>
-          <button type="button" id="showRegister">Create account</button>
+        <!-- LOGIN FORM -->
+        <div id="loginView">
+          <p class="eyebrow">SECURE ACCESS</p>
+          <h2>Welcome back</h2>
+          <p class="muted">Enter your account details to continue.</p>
+          <form id="loginForm">
+            <label>Email or Phone number<input type="text" name="identifier" placeholder="name@example.com or +91 00000 00000" required></label>
+            <label>Password<div class="password-wrap"><input type="password" name="password" placeholder="Enter password" required><button type="button" class="toggle-pw" aria-label="Show password">👁</button></div></label>
+            <button class="primary full" type="submit">Sign in</button>
+          </form>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="showForgot">Forgot password?</button>
+            <button type="button" class="link-btn" id="showRegister">Create an account</button>
+          </div>
         </div>
-        <form id="loginForm" class="auth-form">
-          <label>Email address<input type="email" name="email" placeholder="name@example.com" required></label>
-          <label>Password
-            <span class="password-field">
-              <input type="password" name="password" placeholder="Enter password" required>
-              <button type="button" data-toggle-password="loginForm">Show</button>
-            </span>
-          </label>
-          <button class="primary full" type="submit">Sign in</button>
-        </form>
-        <form id="createAccountForm" class="auth-form hidden">
-          <label>Full name<input name="name" placeholder="Your full name" required maxlength="100"></label>
-          <label>Phone number<input name="phone" placeholder="+91 98765 43210" maxlength="30"></label>
-          <label>Email address<input type="email" name="email" placeholder="you@example.com" required maxlength="120"></label>
-          <label>Password
-            <span class="password-field">
-              <input type="password" name="password" placeholder="Minimum 6 characters" required minlength="6">
-              <button type="button" data-toggle-password="createAccountForm">Show</button>
-            </span>
-          </label>
-          <label>Confirm password
-            <span class="password-field">
-              <input type="password" name="confirm_password" placeholder="Repeat password" required minlength="6">
-              <button type="button" data-toggle-password="createAccountForm">Show</button>
-            </span>
-          </label>
-          <button class="primary full" type="submit">Create account</button>
-        </form>
 
+        <!-- REGISTER FORM -->
+        <div id="registerView" class="hidden">
+          <p class="eyebrow">CREATE ACCOUNT</p>
+          <h2>Get started</h2>
+          <p class="muted">Create a new customer account.</p>
+          <form id="registerForm">
+            <label>Full name<input type="text" name="name" placeholder="Your full name" required></label>
+            <label>Email address<input type="email" name="email" placeholder="name@example.com" required></label>
+            <label>Phone number<input type="tel" name="phone" placeholder="+91 00000 00000"></label>
+            <label>Password<div class="password-wrap"><input type="password" name="password" placeholder="Min 6 characters" required minlength="6"><button type="button" class="toggle-pw" aria-label="Show password">👁</button></div></label>
+            <button class="primary full" type="submit">Create account</button>
+          </form>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="showLoginFromRegister">Already have an account? Sign in</button>
+          </div>
+        </div>
+
+        <!-- FORGOT PASSWORD FORM -->
+        <div id="forgotView" class="hidden">
+          <p class="eyebrow">PASSWORD RESET</p>
+          <h2>Forgot your password?</h2>
+          <p class="muted">Enter your email or phone number to receive a reset OTP.</p>
+          <form id="forgotForm">
+            <label>Email or Phone number<input type="text" name="identifier" placeholder="name@example.com or +91 00000 00000" required></label>
+            <button class="primary full" type="submit">Send OTP</button>
+          </form>
+          <div id="forgotNotice" class="hidden"></div>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="showLoginFromForgot">Back to sign in</button>
+          </div>
+        </div>
+
+        <!-- VERIFY OTP FORM (step 1: enter OTP only) -->
+        <div id="resetView" class="hidden">
+          <p class="eyebrow">PASSWORD RESET</p>
+          <h2>Enter your OTP</h2>
+          <p class="muted" id="resetSubtitle">We sent a 6-digit OTP to your email.</p>
+          <form id="verifyOtpForm">
+            <input type="hidden" name="email" id="resetEmail">
+            <label>OTP code<input type="text" name="otp" placeholder="6-digit OTP" required maxlength="6" pattern="[0-9]{6}"></label>
+            <button class="primary full" type="submit">Verify OTP</button>
+          </form>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="showLoginFromReset">Back to sign in</button>
+          </div>
+        </div>
+
+        <!-- SET NEW PASSWORD FORM (step 2: after OTP is verified) -->
+        <div id="setPasswordView" class="hidden">
+          <p class="eyebrow">PASSWORD RESET</p>
+          <h2>Set new password</h2>
+          <p class="muted">Your OTP has been verified. Enter your new password below.</p>
+          <form id="setPasswordForm">
+            <input type="hidden" name="email" id="newPassEmail">
+            <input type="hidden" name="otp" id="newPassOtp">
+            <label>New password<div class="password-wrap"><input type="password" name="password" placeholder="Min 6 characters" required minlength="6"><button type="button" class="toggle-pw" aria-label="Show password">👁</button></div></label>
+            <label>Confirm password<div class="password-wrap"><input type="password" id="confirmPassword" placeholder="Re-enter password" required minlength="6"><button type="button" class="toggle-pw" aria-label="Show password">👁</button></div></label>
+            <button class="primary full" type="submit">Set password</button>
+          </form>
+          <div class="auth-links">
+            <button type="button" class="link-btn" id="showLoginFromSetPass">Back to sign in</button>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <section class="app-shell hidden" id="appShell">
-    <aside class="sidebar">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="brand-mark">SD</span><div><strong>SD Digitals</strong><small id="portalName">Portal</small></div></div>
       <nav id="navigation"></nav>
       <div class="sidebar-foot">
@@ -76,6 +120,7 @@
     </aside>
     <main>
       <header class="topbar">
+        <button class="hamburger" id="menuToggle" aria-label="Toggle menu">&#9776;</button>
         <div><p class="eyebrow" id="pageEyebrow">PORTAL</p><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle" class="muted"></p></div>
         <div id="headerAction"></div>
       </header>

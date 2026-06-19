@@ -84,9 +84,21 @@ CREATE TABLE IF NOT EXISTS action_history (
     FOREIGN KEY (return_id) REFERENCES equipment_returns(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    otp_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_equipment_status ON equipment(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_returns_status ON equipment_returns(status);
 CREATE INDEX IF NOT EXISTS idx_returns_due_date ON equipment_returns(return_due_date);
+CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_otps(user_id, used);

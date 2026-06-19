@@ -9,12 +9,11 @@ A role-based rental operations application for SD Digitals. Customers can book a
 | User | `user@sd-digitals.com` | `User@123` |
 | Admin | `admin@sd-digitals.com` | `Admin@123` |
 
-Both roles use the same login page. The application opens the correct portal after authentication. New customers can also use **Create account** on the login page to register their own user account.
+Both roles use the same login page. The application opens the correct portal after authentication.
 
 ## User side
 
-- Login
-- Create account for new customers
+- Login / Register / Forgot Password
 - Dashboard with rental totals and recent activity
 - Book Equipment catalogue with rate, deposit, and availability
 - Return Equipment request workflow
@@ -44,7 +43,6 @@ Both roles use the same login page. The application opens the correct portal aft
 
 ```powershell
 python -m pip install -r requirements.txt
-python -m flask --app backend.app seed
 python run.py
 ```
 
@@ -56,25 +54,50 @@ Open `http://127.0.0.1:5000`.
 python -m unittest discover -s tests -v
 ```
 
-The automated suite covers login, permissions, inventory, bookings, approval, stock updates, return requests, clean inspections, damage claims, deductions, profiles, dashboards, and reports.
+The automated suite covers login, registration, password reset, permissions, inventory, bookings, approval, stock updates, return requests, clean inspections, damage claims, deductions, profiles, dashboards, and reports.
 
 ## Main API groups
 
-- `/api/auth/*` - login, logout, and current account
-- `/api/profile` - user/admin profile
-- `/api/equipment` - catalogue and inventory management
-- `/api/bookings` - booking requests and status management
-- `/api/returns/*` - return requests, inspections, deductions, and statuses
-- `/api/customers` - admin customer management
-- `/api/dashboard` - role-specific dashboard data
-- `/api/reports/returns.csv` - admin CSV report
+- `/api/auth/*` — login, register, forgot password, OTP verification, reset password, logout, and current account
+- `/api/profile` — user/admin profile
+- `/api/equipment` — catalogue and inventory management
+- `/api/bookings` — booking requests and status management
+- `/api/returns/*` — return requests, inspections, deductions, and statuses
+- `/api/customers` — admin customer management
+- `/api/dashboard` — role-specific dashboard data
+- `/api/reports/returns.csv` — admin CSV report
 
 ## Project structure
 
-```text
-backend/     Flask API, authentication, workflow rules, schema
-frontend/    Login, user portal, admin portal, responsive styles
-tests/       Automated role and end-to-end workflow tests
-docs/        Report, test plan, and deployment guide
-data/        SQLite database generated at runtime
+```
+Equipment_Return_Damage_Tracker/
+│
+├── run.py                    # Application entry point
+├── requirements.txt          # Python dependencies
+├── .env                      # Environment variables (SMTP, secret key)
+├── .gitignore                # Git ignore rules
+├── README.md                 # This file
+│
+├── backend/                  # Flask API layer
+│   ├── __init__.py           # Package marker
+│   ├── app.py                # Application factory, routes, and business logic
+│   └── schema.sql            # SQLite table definitions and indexes
+│
+├── frontend/                 # Client-side UI
+│   ├── templates/
+│   │   └── index.html        # Single-page app shell
+│   └── static/
+│       ├── app.js            # UI logic, rendering, and API calls
+│       └── styles.css        # Responsive styles
+│
+├── data/                     # SQLite database (auto-created at runtime)
+│   └── equipment_tracker.db
+│
+├── tests/                    # Automated test suite
+│   └── test_app.py           # End-to-end workflow tests
+│
+└── docs/                     # Project documentation
+    ├── PROJECT_REPORT.md     # Detailed project report
+    ├── TEST_PLAN.md          # Testing strategy and plan
+    └── DEPLOYMENT.md         # Deployment instructions
 ```
